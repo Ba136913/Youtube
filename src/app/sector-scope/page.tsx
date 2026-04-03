@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { SECTORS_LIST, STOCKS_BY_SECTOR } from "@/lib/market-data";
+import { SECTORS_LIST, STOCKS_BY_SECTOR, getSectorData } from "@/lib/market-data";
 import { 
   LayoutGrid, List, ArrowUpCircle, ArrowDownCircle, 
   ExternalLink, ChevronRight, BarChart3, TrendingUp, 
@@ -13,7 +13,7 @@ type SourceType = 'tradingView' | 'yahoo' | 'google' | 'moneyControl';
 
 export default function SectorScope() {
   const [trinityData, setTrinityData] = useState<any>(null);
-  const [selectedSource, setSelectedSource] = useState<SourceType>('tradingView'); // DEFAULT: TRADINGVIEW
+  const [selectedSource, setSelectedSource] = useState<SourceType>('tradingView'); 
   const [selectedSector, setSelectedSector] = useState<any>(null);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,7 @@ export default function SectorScope() {
         setRefreshTimer(Math.floor(response.meta.refreshIn / 1000));
       }
     } catch (e) {
-      console.error("Trinity Engine Sync Error", e);
+      console.error("Trinity Sync Error", e);
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,9 @@ export default function SectorScope() {
     const sourceData = trinityData[selectedSource];
 
     return SECTORS_LIST.map(name => {
-      const symbols = STOCKS_BY_SECTOR[name] || [];
+      // EAGLE-EYE: Force unique symbols using Set
+      const symbols = Array.from(new Set(STOCKS_BY_SECTOR[name] || []));
+      
       const stocks = symbols.map(s => {
         const live = sourceData[s] || { price: 0, chgPct: 0, isBullish: false };
         return {
@@ -103,9 +105,9 @@ export default function SectorScope() {
 
   if (loading && !trinityData) {
     return (
-        <div className="min-h-screen bg-[#000] flex flex-col items-center justify-center gap-6 font-sans">
+        <div className="min-h-screen bg-[#000] flex flex-col items-center justify-center gap-6">
             <Loader2 size={48} className="text-blue-500 animate-spin" />
-            <p className="text-slate-500 font-black uppercase tracking-[0.5em] text-xs">Synchronizing Neural Nodes...</p>
+            <p className="text-slate-500 font-black uppercase tracking-[0.5em] text-xs font-sans">Verifying Neural Connectivity...</p>
         </div>
     );
   }
@@ -117,7 +119,7 @@ export default function SectorScope() {
       <div className="bg-[#0A0A0F] border-b border-white/5 sticky top-0 z-[200] backdrop-blur-xl">
         <div className="max-w-[1600px] mx-auto px-6 h-10 flex items-center justify-between">
             <div className="flex items-center gap-6">
-                <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Market Node:</span>
+                <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Active Node:</span>
                 <div className="flex gap-2">
                     {(['tradingView', 'yahoo', 'google', 'moneyControl'] as SourceType[]).map(source => (
                         <button 
@@ -125,7 +127,7 @@ export default function SectorScope() {
                             onClick={() => setSelectedSource(source)}
                             className={cn(
                                 "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded transition-all border",
-                                selectedSource === source ? "bg-blue-600 border-blue-500 text-white shadow-lg" : "bg-white/5 border-white/5 text-slate-500 hover:text-slate-300"
+                                selectedSource === source ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20" : "bg-white/5 border-white/5 text-slate-500 hover:text-slate-300"
                             )}
                         >
                             {source}
@@ -135,7 +137,7 @@ export default function SectorScope() {
             </div>
             <div className="flex items-center gap-4">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest font-mono">REFRESH: {Math.floor(refreshTimer / 60)}m {refreshTimer % 60}s</span>
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]" />
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e] animate-pulse" />
             </div>
         </div>
       </div>
@@ -144,7 +146,7 @@ export default function SectorScope() {
         <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setSelectedSector(null)}>
-              <div className="w-10 h-10 bg-blue-600/10 border border-blue-500/30 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 bg-blue-600/10 border border-blue-500/30 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-all">
                 <Boxes size={20} className="text-blue-500" />
               </div>
               <h1 className="text-xl font-black tracking-tighter uppercase italic leading-none">
@@ -155,8 +157,8 @@ export default function SectorScope() {
           
           <div className="flex items-center gap-6">
              <div className="relative group">
-               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
-               <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Neural Scan..." className="bg-black/50 border border-white/10 rounded-xl pl-10 pr-6 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/40 w-[250px] font-bold" />
+               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-blue-500 transition-colors" size={14} />
+               <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Neural Scan..." className="bg-black/50 border border-white/10 rounded-xl pl-10 pr-6 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/40 w-[300px] font-bold shadow-inner placeholder:text-slate-800" />
              </div>
              <button onClick={fetchTrinityData} className="p-2 bg-blue-600 rounded-lg hover:bg-blue-500 transition-all shadow-lg group active:scale-95">
                 <RefreshCcw size={16} className={cn("text-white", loading && "animate-spin")} />
@@ -183,7 +185,7 @@ export default function SectorScope() {
                   </div>
                   <div>
                     <h3 className="font-black text-lg tracking-tighter group-hover:text-blue-400 transition-colors uppercase italic leading-none">{sector.name}</h3>
-                    <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest mt-2 border", sector.status === 'bullish' ? "bg-green-500/10 border-green-500/20 text-green-500" : "bg-red-500/10 border-red-500/20 text-red-500")}>
+                    <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest mt-2 border shadow-2xl backdrop-blur-md", sector.status === 'bullish' ? "bg-green-500/10 border-green-500/20 text-green-500" : "bg-red-500/10 border-red-500/20 text-red-500")}>
                       <div className={cn("w-1 h-1 rounded-full", sector.status === 'bullish' ? "bg-green-500 shadow-[0_0_8px_#22c55e]" : "bg-red-500 shadow-[0_0_8px_#ef4444]")} />
                       {sector.status} TREND
                     </div>
@@ -193,7 +195,7 @@ export default function SectorScope() {
                       <span>{sector.upCount} UP</span>
                       <span>{sector.downCount} DOWN</span>
                     </div>
-                    <div className="h-1 w-full bg-black rounded-full overflow-hidden flex shadow-inner">
+                    <div className="h-1 w-full bg-black rounded-full overflow-hidden flex ring-1 ring-white/5 shadow-inner">
                       <div className="bg-green-500 h-full transition-all duration-1000" style={{ width: `${(sector.upCount/sector.totalCount)*100}%` }} />
                       <div className="bg-red-500 h-full transition-all duration-1000" style={{ width: `${(sector.downCount/sector.totalCount)*100}%` }} />
                     </div>
@@ -207,31 +209,31 @@ export default function SectorScope() {
             <div className="lg:w-[55%] animate-in fade-in slide-in-from-right-20 duration-700 sticky top-32 h-[calc(100vh-160px)] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-white/10">
               <div className="bg-[#0C0E14] border border-blue-500/30 rounded-[32px] overflow-hidden shadow-2xl relative">
                 <div className="p-10 bg-gradient-to-br from-blue-900/20 via-[#0C0E14] to-transparent">
-                  <button onClick={() => setSelectedSector(null)} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-white mb-8">
-                    <ChevronRight className="rotate-180" size={14} /> EXIT MATRIX
+                  <button onClick={() => setSelectedSector(null)} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-white mb-8 group">
+                    <ChevronRight className="rotate-180 group-hover:-translate-x-1 transition-transform" size={14} /> EXIT MATRIX
                   </button>
                   <h2 className="text-5xl font-black tracking-tighter uppercase italic drop-shadow-2xl text-white/90">{activeSector.name}</h2>
                   <div className="flex items-center gap-6 mt-8">
                     <div className="bg-white text-black px-4 py-2 rounded-xl font-black font-mono text-2xl shadow-xl">{activeSector.multiplier}</div>
                     <div className="space-y-1">
                         <p className="text-xs font-black text-blue-400 tracking-widest uppercase italic">Neural Analysis</p>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.3em] uppercase tracking-widest">TradingView Node Aligned</p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.3em] uppercase">Verified Node: {selectedSource.toUpperCase()}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-8">
-                  <div className="flex items-center justify-between mb-8 px-6 text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 border-b border-white/5 pb-6">
+                <div className="p-8 border-t border-white/5">
+                  <div className="flex items-center justify-between mb-8 px-6 text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 pb-2">
                     <span>Neural Asset Code</span>
                     <div className="flex gap-24 pr-16">
-                      <span>R.Fac</span>
+                      <span>R.Fac Momentum</span>
                       <span>Volatility Chg%</span>
                     </div>
                   </div>
                   <div className="space-y-3">
                     {activeSector.stocks.sort((a, b) => b.chgPct - a.chgPct).map(stock => (
                       <button 
-                        key={stock.symbol} 
+                        key={`${activeSector.id}-${stock.symbol}`} 
                         onClick={() => handleStockClick(stock.symbol)} 
                         className="w-full flex items-center justify-between p-6 rounded-[24px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-blue-500/60 hover:translate-x-4 transition-all duration-500 group"
                       >
@@ -245,16 +247,16 @@ export default function SectorScope() {
                         <div className="flex items-center gap-12">
                           <span className="text-lg font-black font-mono w-24 text-right text-blue-400 italic">{(stock.rFac || "0.00x")}</span>
                           <div className="w-28 text-right">
-                            <div className={cn("text-2xl font-black font-mono tracking-tighter leading-none", stock.isBullish ? "text-green-500" : "text-red-500")}>
+                            <div className={cn("text-2xl font-black font-mono tracking-tighter leading-none", stock.isBullish ? "text-green-500 shadow-green-500/20" : "text-red-500 shadow-red-500/20")}>
                               {stock.chgPct >= 0 ? "+" : ""}{stock.chgPct.toFixed(2)}%
                             </div>
                             <div className="h-1 w-full bg-black rounded-full mt-2 overflow-hidden ring-1 ring-white/5 shadow-inner">
-                                <div className={cn("h-full transition-all duration-1000", stock.isBullish ? "bg-green-500" : "bg-red-500")} style={{ width: `${Math.min(Math.abs(stock.chgPct) * 15, 100)}%` }} />
+                                <div className={cn("h-full transition-all duration-1000 shadow-[0_0_8px_currentColor]", stock.isBullish ? "bg-green-500" : "bg-red-500")} style={{ width: `${Math.min(Math.abs(stock.chgPct) * 15, 100)}%` }} />
                             </div>
                           </div>
                           <div className={cn(
                             "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 shadow-xl border", 
-                            stock.isBullish ? "bg-green-500/10 border-green-500/20 text-green-500 group-hover:bg-green-500 group-hover:text-white" : "bg-red-500/10 border-red-500/20 text-red-500 group-hover:bg-red-500 group-hover:text-white"
+                            stock.isBullish ? "bg-green-500/10 border-green-500/30 text-green-500 group-hover:bg-green-500 group-hover:text-white" : "bg-red-500/10 border-red-500/20 text-red-500 group-hover:bg-red-500 group-hover:text-white"
                           )}>
                             {stock.isBullish ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                           </div>
@@ -268,6 +270,11 @@ export default function SectorScope() {
           )}
         </div>
       </main>
+
+      <style jsx global>{`
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .animate-marquee { animation: marquee 40s linear infinite; }
+      `}</style>
     </div>
   );
 }
