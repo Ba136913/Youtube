@@ -19,27 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "cto.new - Completely free AI code agent",
-  description: "cto.new is the world's first completely free AI code agent. Use the latest frontier models from Anthropic, OpenAI and more. No credit card or API keys required.",
-  openGraph: {
-    title: "cto.new - Completely free AI code agent",
-    description: "cto.new is the world's first completely free AI code agent. Use the latest frontier models from Anthropic, OpenAI and more. No credit card or API keys required.",
-    url: "https://cto.new",
-    siteName: "cto.new",
-    images: [
-      {
-        url: "https://framerusercontent.com/images/NC6i6vDeOQTWZis14FFWERyH7s.png",
-      },
-    ],
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    site: "@ctodotnew",
-    title: "cto.new - Completely free AI code agent",
-    description: "cto.new is the world's first completely free AI code agent. Use the latest frontier models from Anthropic, OpenAI and more. No credit card or API keys required.",
-    images: ["https://framerusercontent.com/images/NC6i6vDeOQTWZis14FFWERyH7s.png"],
-  },
+  title: "Sector Scope - Live NSE Sector Analytics",
+  description: "Real-time NSE sector heatmap and stock analysis for professional traders. Track bullish and bearish momentum across all sectors.",
 };
 
 export default function RootLayout({
