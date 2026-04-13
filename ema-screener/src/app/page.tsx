@@ -3,11 +3,11 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import Chart from '@/components/Chart';
-import { fetchLiveMarketData, StockData } from '@/lib/data';
+import { fetchBatchData, StockData, NSE_FO_STOCKS } from '@/lib/data';
 import { 
   Menu, RefreshCcw, SearchIcon, Activity, 
   Loader2, ArrowUpRight, ArrowDownRight, 
-  ShieldCheck, Clock, Bell, Volume2, Database
+  ShieldCheck, Clock, Bell, Database
 } from 'lucide-react';
 
 export default function Home() {
@@ -20,44 +20,41 @@ export default function Home() {
   const [directionFilter, setDirectionFilter] = useState<'BULLISH' | 'BEARISH'>('BULLISH');
   const [notification, setNotification] = useState<{msg: string, type: string} | null>(null);
   
-  const lastSignalCount = useRef<number>(0);
+  const isInitialLoad = useRef(true);
 
-  const loadMarketData = useCallback(async () => {
+  const startMarketSync = useCallback(async () => {
+    if (syncStatus === 'SYNCING') return;
     setSyncStatus('SYNCING');
-    try {
-        const stocks = await fetchLiveMarketData();
-        if (stocks && stocks.length > 0) {
-            // Alert logic for new combined breakouts
-            const combinedCount = stocks.filter(s => s.lastSignal?.type === 'COMBINED').length;
-            if (combinedCount > lastSignalCount.current && lastSignalCount.current !== 0) {
-                playAlert();
-                showToast("New Combined Breakout Detected", "BULLISH");
-            }
-            lastSignalCount.current = combinedCount;
-            setAllData(stocks);
-            setSyncStatus('IDLE');
+
+    const chunkSize = 15;
+    const symbols = NSE_FO_STOCKS;
+    
+    // Process in batches progressively
+    for (let i = 0; i < symbols.length; i += chunkSize) {
+        const batch = symbols.slice(i, i + chunkSize);
+        const batchResults = await fetchBatchData(batch);
+        
+        if (batchResults.length > 0) {
+            setAllData(prev => {
+                const existing = new Map(prev.map(s => [s.symbol, s]));
+                batchResults.forEach(s => existing.set(s.symbol, s));
+                return Array.from(existing.values());
+            });
         }
-    } catch (e) {
-        setSyncStatus('ERROR');
+        // Small delay to be safe
+        await new Promise(r => setTimeout(r, 100));
     }
-  }, []);
-
-  const playAlert = () => {
-    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
-    audio.volume = 0.2;
-    audio.play().catch(() => {});
-  };
-
-  const showToast = (msg: string, type: string) => {
-    setNotification({ msg, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
+    
+    setSyncStatus('IDLE');
+    isInitialLoad.current = false;
+  }, [syncStatus]);
 
   useEffect(() => {
-    loadMarketData();
-    const interval = setInterval(loadMarketData, 15000);
+    startMarketSync();
+    // Refresh full market every 5 minutes
+    const interval = setInterval(startMarketSync, 300000);
     return () => clearInterval(interval);
-  }, [loadMarketData]);
+  }, []);
 
   const selectedStock = useMemo(() => {
     return allData.find(d => d.symbol === selectedSymbol) || allData[0];
@@ -89,16 +86,6 @@ export default function Home() {
     return categorizedData[key] || [];
   }, [activeTab, directionFilter, categorizedData]);
 
-  if (allData.length === 0) {
-    return (
-      <div className="min-h-screen bg-[#030406] text-white flex flex-col items-center justify-center font-sans overflow-hidden">
-        <Loader2 className="text-blue-500 animate-spin mb-6" size={48} />
-        <h2 className="text-xl font-bold tracking-tight text-white/90">Synchronizing Market Layers...</h2>
-        <p className="text-gray-600 text-xs font-medium">Ghost Engine Engaging (Est. 15s)</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen bg-[#030406] overflow-hidden font-sans text-gray-400 antialiased relative">
       
@@ -114,9 +101,9 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2">
                 <div className={`px-2 py-1 rounded bg-white/5 border border-white/10 text-[9px] font-black uppercase ${syncStatus === 'SYNCING' ? 'text-blue-500 animate-pulse' : 'text-green-500'}`}>
-                    {syncStatus === 'SYNCING' ? 'Sync' : 'Live'}
+                    {syncStatus === 'SYNCING' ? 'Scanning' : 'Live'}
                 </div>
-                <button onClick={loadMarketData} className="p-2 text-gray-500 hover:text-white transition-all bg-white/5 rounded-xl border border-white/5">
+                <button onClick={startMarketSync} className="p-2 text-gray-500 hover:text-white transition-all bg-white/5 rounded-xl border border-white/5">
                     <RefreshCcw size={14} className={syncStatus === 'SYNCING' ? 'animate-spin' : ''} />
                 </button>
             </div>
@@ -142,12 +129,12 @@ export default function Home() {
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => setDirectionFilter('BULLISH')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${directionFilter === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-500' : 'bg-white/5 border-transparent text-gray-700'}`}>
+            <button onClick={() => setDirectionFilter('BULLISH')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${directionFilter === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-white/5 border-transparent text-gray-700'}`}>
                 <ArrowUpRight size={14} />
                 <span className="text-[10px] font-black uppercase tracking-widest">Bull</span>
                 <span className="text-[9px] font-mono font-bold bg-emerald-500/20 px-1.5 rounded">{categorizedData[`${activeTab.toLowerCase()}_bull` as keyof typeof categorizedData]?.length || 0}</span>
             </button>
-            <button onClick={() => setDirectionFilter('BEARISH')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${directionFilter === 'BEARISH' ? 'bg-rose-500/10 border-rose-500/50 text-rose-500' : 'bg-white/5 border-transparent text-gray-700'}`}>
+            <button onClick={() => setDirectionFilter('BEARISH')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${directionFilter === 'BEARISH' ? 'bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.1)]' : 'bg-white/5 border-transparent text-gray-700'}`}>
                 <ArrowDownRight size={14} />
                 <span className="text-[10px] font-black uppercase tracking-widest">Bear</span>
                 <span className="text-[9px] font-mono font-bold bg-rose-500/20 px-1.5 rounded">{categorizedData[`${activeTab.toLowerCase()}_bear` as keyof typeof categorizedData]?.length || 0}</span>
@@ -156,7 +143,12 @@ export default function Home() {
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1.5">
-            {displayList.map((stock) => (
+            {allData.length === 0 && syncStatus === 'SYNCING' ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4 opacity-30">
+                    <Loader2 className="animate-spin text-blue-500" size={32} />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-center px-8">Engaging Neural Nodes... (Stocks appearing soon)</p>
+                </div>
+            ) : displayList.map((stock) => (
                 <div key={stock.symbol} onClick={() => setSelectedSymbol(stock.symbol)} className={`p-4 cursor-pointer rounded-2xl transition-all border group relative overflow-hidden ${selectedSymbol === stock.symbol ? 'bg-blue-600/10 border-blue-500/30 shadow-xl' : 'bg-transparent border-transparent hover:bg-white/5'}`}>
                     <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-4">
@@ -167,12 +159,12 @@ export default function Home() {
                                 <div className="flex items-center gap-2">
                                     <h3 className={`font-black text-sm tracking-tight uppercase ${selectedSymbol === stock.symbol ? 'text-blue-400' : 'text-white/90'}`}>{stock.symbol}</h3>
                                     {stock.lastSignal?.isVolumeSpike && (
-                                        <div className="px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-[7px] font-black text-blue-400 uppercase tracking-widest">Vol_Spike</div>
+                                        <div className="px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-[7px] font-black text-blue-400 uppercase tracking-widest">VOL</div>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     <span className={`text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter ${stock.lastSignal?.direction === 'BULLISH' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                                        {stock.lastSignal?.type} Signal
+                                        {stock.lastSignal?.type}
                                     </span>
                                 </div>
                             </div>
@@ -189,49 +181,32 @@ export default function Home() {
         </div>
 
         <div className="p-4 bg-black/40 border-t border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-                <div className="flex flex-col">
-                    <span className="text-[8px] font-black text-gray-700 uppercase tracking-widest leading-none mb-1">Nodes</span>
-                    <span className="text-xs font-black text-white/70">{allData.length}</span>
-                </div>
-                <div className="w-[1px] h-6 bg-white/5"></div>
-                <Database size={14} className="text-gray-700" />
+            <div className="flex items-center gap-4 text-gray-700">
+                <span className="text-xs font-black">{allData.length} NODES</span>
+                <div className="w-[1px] h-4 bg-white/5"></div>
+                <Database size={14} />
             </div>
-            <div className="flex items-center gap-2">
-                <Volume2 size={14} className="text-gray-700" />
-                <span className="text-[8px] font-black text-gray-700 uppercase tracking-widest">Audio_Enabled</span>
-            </div>
+            <span className="text-[8px] font-black text-gray-700 uppercase tracking-widest italic">Ghost_v3.3</span>
         </div>
       </div>
 
       {/* MAIN VIEW */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#030406] relative">
-        
-        {/* SMALL TOAST NOTIFICATION (Top Right) */}
-        {notification && (
-            <div className="absolute top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 bg-[#080a0d] border border-white/10 rounded-2xl shadow-2xl animate-in slide-in-from-right-8 fade-in duration-500">
-                <div className={`p-2 rounded-xl ${notification.type === 'BULLISH' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                    <Bell size={16} />
-                </div>
-                <span className="text-xs font-black text-white uppercase tracking-tight">{notification.msg}</span>
-            </div>
-        )}
-
         <div className="h-16 border-b border-white/5 bg-black/20 flex items-center justify-between px-8 z-10 shadow-xl">
           <div className="flex items-center gap-6">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-gray-600 hover:text-white transition-all"><Menu size={20} /></button>
             <div className="flex flex-col">
                 <div className="flex items-center gap-2 mb-0.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_blue]"></div>
-                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-[0.3em]">Neural_Interface</span>
+                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-[0.3em]">Quantum_Visualizer</span>
                 </div>
                 <h2 className="text-white font-black text-xl tracking-tighter uppercase">{selectedStock?.symbol || 'Select Node'}</h2>
             </div>
           </div>
           <div className="flex items-center gap-4">
-             <div className="px-4 py-2 bg-white/5 border border-white/5 rounded-xl flex items-center gap-3">
-                <ShieldCheck size={16} className="text-blue-500" />
-                <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest italic">Ghost_Safe</span>
+             <div className="px-4 py-2 bg-white/5 border border-white/5 rounded-xl flex items-center gap-3 text-blue-500 shadow-[inset_0_0_10px_rgba(59,130,246,0.1)]">
+                <ShieldCheck size={16} />
+                <span className="text-[10px] font-black uppercase tracking-widest">Ghost Safe</span>
              </div>
           </div>
         </div>

@@ -1,15 +1,15 @@
 
 import { NextResponse } from 'next/server';
-import { MarketStore } from '@/lib/market-store';
+import { GhostEngine } from '@/lib/ghost-engine';
 
-export async function GET() {
-  // MarketStore.getData() returns { stocks: [...], isSyncing, lastSync }
-  const storeData = MarketStore.getData();
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const symbolsParam = searchParams.get('symbols');
   
-  return NextResponse.json({
-    stocks: storeData.stocks,
-    lastSync: storeData.lastSync,
-    isSyncing: storeData.isSyncing,
-    serverTime: Date.now()
-  });
+  if (!symbolsParam) return NextResponse.json({ error: 'No symbols' }, { status: 400 });
+
+  const symbols = symbolsParam.split(',');
+  const results = await GhostEngine.fetchBatch(symbols);
+
+  return NextResponse.json(results);
 }

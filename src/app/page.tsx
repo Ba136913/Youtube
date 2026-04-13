@@ -1,5 +1,5 @@
-import SectorScope from "./sector-scope/page";
+import YouTubePremium from "./youtube/page";
 
 export default function Home() {
-  return <SectorScope />;
+  return <YouTubePremium />;
 }
