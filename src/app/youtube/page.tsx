@@ -141,6 +141,8 @@ function YouTubeContent() {
     if (node) relObserver.current.observe(node);
   }, [loading, hasMoreRelated, videoId]);
 
+  const categories = ["All", "Music", "Gaming", "News", "Bollywood", "Cricket", "Comedy", "Shorts", "Live", "Lo-fi"];
+
   const currentVideo = [...videos, ...relatedVideos].find(v => v.id === videoId);
 
   return (
