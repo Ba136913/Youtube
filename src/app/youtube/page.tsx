@@ -6,8 +6,7 @@ import { signIn, signOut, useSession, SessionProvider } from "next-auth/react";
 import { 
   Search, Play, Settings, Grid, Bell, User, Home, Compass, Library, History, Clock, 
   ThumbsUp, Share2, Download, MoreHorizontal, TrendingUp, Music2, Gamepad2, Trophy, Flame,
-  CheckCircle2, Volume2, Maximize2, SkipForward, SkipBack, Loader2, Menu, LogIn, LogOut, X, ArrowLeft,
-  Youtube
+  CheckCircle2, Volume2, Maximize2, SkipForward, SkipBack, Loader2, Menu, LogIn, LogOut, X, ArrowLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
