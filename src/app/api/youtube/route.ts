@@ -93,19 +93,20 @@ export async function GET(request: Request) {
     }
 
     // 2. Fallback to Piped API if Scraper is blocked
-    if (!videos || videos.length < 5) {
-        const data = await fetchFromPiped(related ? `/streams/${related}` : (q ? `/search?q=${encodeURIComponent(q)}` : `/trending?region=IN`));
+    if (!videos || (Array.isArray(videos) && videos.length < 5)) {
+        const pipedUrl = related ? `/streams/${related}` : (q && q !== 'All' ? `/search?q=${encodeURIComponent(q)}` : `/trending?region=IN`);
+        const data = await fetchFromPiped(pipedUrl);
         const raw = data?.relatedStreams || data?.items || (Array.isArray(data) ? data : []);
         videos = raw.map((v: any) => ({
             id: v.videoId || v.url?.split('?v=')[1] || v.id,
             title: v.title,
             channel: v.uploaderName || v.uploader,
             channelAvatar: v.uploaderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(v.uploaderName || 'Y')}&background=random`,
-            views: v.views ? (v.views > 1000000 ? `${(v.views/1000000).toFixed(1)}M` : `${(v.views/1000).toFixed(0)}K`) : "LIVE",
-            time: v.uploadedDate || "Recently",
-            duration: v.duration === -1 ? "LIVE" : new Date(v.duration * 1000).toISOString().substring(14, 19),
-            thumbnail: v.thumbnail,
-            isLive: v.duration === -1
+            views: v.shortViewCountText || (v.views ? (v.views > 1000000 ? `${(v.views/1000000).toFixed(1)}M views` : `${(v.views/1000).toFixed(0)}K views`) : "LIVE"),
+            time: v.uploadedDate || v.time || "Recently",
+            duration: v.duration === -1 || v.isLive ? "LIVE" : (typeof v.duration === 'string' ? v.duration : new Date(v.duration * 1000).toISOString().substring(14, 19)),
+            thumbnail: v.thumbnail || v.thumbnailUrl,
+            isLive: v.duration === -1 || v.isLive
         })).filter((v:any) => v.id);
     }
 
