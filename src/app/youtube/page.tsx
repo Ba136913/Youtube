@@ -6,7 +6,8 @@ import { signIn, signOut, useSession, SessionProvider } from "next-auth/react";
 import { 
   Search, Play, Settings, Grid, Bell, User, Home, Compass, Library, History, Clock, 
   ThumbsUp, Share2, Download, MoreHorizontal, TrendingUp, Music2, Gamepad2, Trophy, Flame,
-  CheckCircle2, Volume2, Maximize2, SkipForward, SkipBack, Loader2, Menu, LogIn, LogOut, X, ArrowLeft
+  CheckCircle2, Volume2, Maximize2, SkipForward, SkipBack, Loader2, Menu, LogIn, LogOut, X, ArrowLeft,
+  Youtube
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,19 +20,8 @@ function YouTubeIcon({ className, size = 24 }: { className?: string, size?: numb
 }
 
 interface Video {
-  id: string; title: string; channel: string; channelAvatar?: string; views: string; time: string; duration: string; thumbnail: string; isLive?: boolean;
+  id: string; title: string; channel: string; channelAvatar?: string; views: string; time: string; duration: string; thumbnail: string; isLive?: boolean; isShort?: boolean;
 }
-
-const FALLBACK_VIDS: Video[] = [
-    { id: "jfKfPfyJRdk", title: "lofi hip hop radio 💤 beats to sleep/chill to", channel: "Lofi Girl", channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_mKovZ_Z_Z_Z_Z_Z_Z_Z_Z_Z_Z_Z_Z_Z_Z_Z_Z=s176-c-k-c0x00ffffff-no-rj", views: "34K watching", time: "LIVE", duration: "LIVE", thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/maxresdefault.jpg", isLive: true },
-    { id: "dQw4w9WgXcQ", title: "Never Gonna Give You Up", channel: "Rick Astley", views: "1.4B views", time: "14 years ago", duration: "3:33", thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg" },
-    { id: "kJQP7kiw5Fk", title: "Luis Fonsi - Despacito ft. Daddy Yankee", channel: "Luis Fonsi", views: "8.4B views", time: "7 years ago", duration: "4:42", thumbnail: "https://img.youtube.com/vi/kJQP7kiw5Fk/maxresdefault.jpg" },
-    { id: "V9fP6He_0oY", title: "OpenAI Sora - New Mind Blowing Videos!", channel: "Marques Brownlee", views: "8.2M views", time: "5 days ago", duration: "12:45", thumbnail: "https://img.youtube.com/vi/V9fP6He_0oY/maxresdefault.jpg" },
-    { id: "ScMzIvxBSi4", title: "React 19 - Everything You Need to Know", channel: "FireShip", views: "450K views", time: "1 day ago", duration: "10:05", thumbnail: "https://img.youtube.com/vi/ScMzIvxBSi4/maxresdefault.jpg" },
-    { id: "9bZkp7q19f0", title: "PSY - GANGNAM STYLE(강남스타일) M/V", channel: "officialpsy", views: "5.1B views", time: "11 years ago", duration: "4:12", thumbnail: "https://img.youtube.com/vi/9bZkp7q19f0/maxresdefault.jpg" },
-    { id: "hT_nvWreIhg", title: "OneRepublic - Counting Stars", channel: "OneRepublic", views: "3.9B views", time: "10 years ago", duration: "4:43", thumbnail: "https://img.youtube.com/vi/hT_nvWreIhg/maxresdefault.jpg" },
-    { id: "60ItHLz5WEA", title: "Alan Walker - Faded", channel: "Alan Walker", views: "3.5B views", time: "8 years ago", duration: "3:32", thumbnail: "https://img.youtube.com/vi/60ItHLz5WEA/maxresdefault.jpg" }
-];
 
 function YouTubeContent() {
   const router = useRouter();
@@ -45,11 +35,11 @@ function YouTubeContent() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]);
   const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
+  const [currentVideoDetails, setCurrentVideoDetails] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncProgress, setSyncProgress] = useState(0);
   
   const [page, setPage] = useState(1);
-  const [relatedPage, setRelatedPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [hasMoreRelated, setHasMoreRelated] = useState(true);
 
@@ -60,7 +50,7 @@ function YouTubeContent() {
     const pageNum = params.page || 1;
     
     if (pageNum === 1) {
-        if (isRelated) setRelatedVideos([]);
+        if (isRelated) { setRelatedVideos([]); setCurrentVideoDetails(null); }
         else { setLoading(true); setVideos([]); }
     }
     
@@ -83,17 +73,16 @@ function YouTubeContent() {
       
       if (data.videos && data.videos.length > 0) {
         if (isRelated) {
+            if (data.currentVideo) setCurrentVideoDetails(data.currentVideo);
             setRelatedVideos(prev => {
-                const combined = pageNum === 1 ? data.videos : [...prev, ...data.videos];
-                const unique = Array.from(new Map(combined.map((v: any) => [v.id, v])).values());
-                setHasMoreRelated(data.videos.length >= 10);
-                return unique as Video[];
+                const next = pageNum === 1 ? data.videos : [...prev, ...data.videos];
+                return Array.from(new Map(next.map((v: any) => [v.id, v])).values()) as Video[];
             });
+            setHasMoreRelated(data.videos.length >= 10);
         } else {
             setVideos(prev => {
                 const combined = pageNum === 1 ? (data.videos as Video[]) : [...prev, ...(data.videos as Video[])];
-                const unique = Array.from(new Map(combined.map((v: Video) => [v.id, v])).values());
-                return unique;
+                return Array.from(new Map(combined.map((v: Video) => [v.id, v])).values());
             });
             setHasMore(data.videos.length >= 5);
         }
@@ -101,49 +90,24 @@ function YouTubeContent() {
           if (isRelated) setHasMoreRelated(false);
           else setHasMore(false);
       }
-    } catch (e) { 
-        console.error(e);
-    } finally {
-      setSyncProgress(100);
-      setTimeout(() => { setLoading(false); setSyncProgress(0); }, 300);
-    }
+    } catch (e) { console.error(e); }
+    finally { setSyncProgress(100); setTimeout(() => { setLoading(false); setSyncProgress(0); }, 300); }
   };
 
   useEffect(() => {
     setPage(1);
-    const type = category === 'History' ? 'liked' : (category === 'Subscriptions' ? 'subscriptions' : undefined);
+    let type = undefined;
+    if (category === 'History') type = 'liked';
+    else if (category === 'Subscriptions') type = 'subscriptions';
+    else if (category === 'Shorts') type = 'shorts';
     fetchVideos({ q: query ?? undefined, category: category ?? undefined, page: 1, type });
   }, [query, category]);
 
-  useEffect(() => { if (videoId) { setRelatedPage(1); fetchVideos({ relatedId: videoId, page: 1 }); } }, [videoId]);
+  useEffect(() => { if (videoId) fetchVideos({ relatedId: videoId, page: 1 }); }, [videoId]);
 
-  const observer = useRef<IntersectionObserver | null>(null);
-  const lastVideoRef = useCallback((node: HTMLDivElement | null) => {
-    if (loading || !hasMore || videoId) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        setPage(p => { const n = p + 1; fetchVideos({ q: query ?? undefined, category: category ?? undefined, page: n }); return n; });
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loading, hasMore, videoId, query, category]);
+  const categories = ["All", "Music", "Gaming", "News", "Bollywood", "Shorts", "Cricket", "Comedy", "Live", "Lo-fi"];
 
-  const relObserver = useRef<IntersectionObserver | null>(null);
-  const lastRelVideoRef = useCallback((node: HTMLDivElement | null) => {
-    if (loading || !hasMoreRelated || !videoId) return;
-    if (relObserver.current) relObserver.current.disconnect();
-    relObserver.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        setRelatedPage(p => { const n = p + 1; fetchVideos({ relatedId: videoId, page: n }); return n; });
-      }
-    });
-    if (node) relObserver.current.observe(node);
-  }, [loading, hasMoreRelated, videoId]);
-
-  const categories = ["All", "Music", "Gaming", "News", "Bollywood", "Cricket", "Comedy", "Shorts", "Live", "Lo-fi"];
-
-  const currentVideo = [...videos, ...relatedVideos].find(v => v.id === videoId);
+  const currentVideo = currentVideoDetails || [...videos, ...relatedVideos].find(v => v.id === videoId);
 
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-[#F1F1F1] font-sans overflow-x-hidden">
@@ -179,52 +143,50 @@ function YouTubeContent() {
       <div className="flex">
         <aside className="w-[240px] hidden lg:flex flex-col p-3 gap-1 sticky top-14 h-[calc(100vh-56px)] border-r border-white/5 overflow-y-auto custom-scrollbar">
           <SidebarItem icon={<Home size={22} />} label="Home" active={!videoId && !query && (!category || category === "All")} onClick={() => router.push('/')} />
-          <SidebarItem icon={<History size={22} />} label="History" active={category === "History"} onClick={() => router.push('/?category=History')} />
+          <SidebarItem icon={<Play size={22} />} label="Shorts" active={category === "Shorts"} onClick={() => router.push('/?category=Shorts')} />
           <SidebarItem icon={<Library size={22} />} label="Subscriptions" active={category === "Subscriptions"} onClick={() => router.push('/?category=Subscriptions')} />
+          <hr className="my-2 border-white/10" />
+          <SidebarItem icon={<History size={22} />} label="History" active={category === "History"} onClick={() => router.push('/?category=History')} />
+          <SidebarItem icon={<ThumbsUp size={22} />} label="Liked Videos" active={category === "Liked"} onClick={() => router.push('/?category=History')} />
           <hr className="my-2 border-white/10" />
           <SidebarItem icon={<Flame size={22} />} label="Trending" active={category === "Trending"} onClick={() => router.push('/?category=Trending')} />
           <SidebarItem icon={<Music2 size={22} />} label="Music" active={category === "Music"} onClick={() => router.push('/?category=Music')} />
-          <SidebarItem icon={<Gamepad2 size={22} />} label="Gaming" active={category === "Gaming"} onClick={() => router.push('/?category=Gaming')} />
         </aside>
 
         <main className="flex-1 p-4 min-w-0">
           {videoId ? (
-            <div className="flex flex-col xl:flex-row gap-6 max-w-[1750px] mx-auto animate-in fade-in duration-500">
+            <div className="flex flex-col xl:flex-row gap-6 max-w-[1750px] mx-auto">
               <div className="flex-1 min-w-0">
                 <div className="aspect-video w-full bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/5">
-                  <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0`} frameBorder="0" allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
+                  <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0`} frameBorder="0" allowFullScreen />
                 </div>
                 <div className="mt-4 space-y-3 px-1">
-                  <h1 className="text-xl font-bold line-clamp-2 leading-snug">{currentVideo?.title || "Premium Stream"}</h1>
+                  <h1 className="text-xl font-bold line-clamp-2">{currentVideo?.title || "Loading video details..."}</h1>
                   <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-                    <img src={currentVideo?.channelAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentVideo?.channel || 'Y')}&background=random&color=fff`} className="w-10 h-10 rounded-full object-cover border border-white/5 shadow-sm" />
-                    <div className="flex-1">
-                        <p className="font-bold">{currentVideo?.channel || "Channel Name"}</p>
-                        <p className="text-xs text-[#AAAAAA]">{currentVideo?.views?.includes('views') ? '1.2M subscribers' : 'Official Channel'}</p>
-                    </div>
-                    <button className="bg-[#F1F1F1] text-black px-4 py-2 rounded-full text-sm font-bold ml-4 hover:bg-[#D9D9D9] transition-colors">Subscribe</button>
+                    <img src={currentVideo?.channelAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentVideo?.channel || 'Y')}&background=random&color=fff`} className="w-10 h-10 rounded-full" />
+                    <div className="flex-1"><p className="font-bold">{currentVideo?.channel || "Channel"}</p><p className="text-xs text-[#AAAAAA]">{currentVideo?.views?.includes('views') ? '1.2M subscribers' : 'Official Channel'}</p></div>
+                    <button className="bg-white text-black px-4 py-2 rounded-full text-sm font-bold hover:bg-[#D9D9D9]">Subscribe</button>
                   </div>
                 </div>
               </div>
               <div className="w-full xl:w-[400px] space-y-3">
-                <h3 className="font-bold text-sm mb-2 text-slate-400 uppercase tracking-widest px-1">Related Videos</h3>
-                {relatedVideos.filter(v => v.id !== videoId).map((video, index) => (
-                  <div key={video.id + index} ref={index === relatedVideos.length - 1 ? lastRelVideoRef : null}><SidebarCard video={video} onClick={() => router.push(`/?v=${video.id}`)} /></div>
+                <h3 className="font-bold text-sm mb-2 text-slate-400 uppercase tracking-widest px-1">Up Next</h3>
+                {relatedVideos.filter(v => v.id !== videoId).map((video) => (
+                  <SidebarCard key={video.id} video={video} onClick={() => router.push(`/?v=${video.id}`)} />
                 ))}
-                {hasMoreRelated && [...Array(3)].map((_, i) => <SkeletonSidebarCard key={i} />)}
-                {!hasMoreRelated && relatedVideos.length === 0 && <p className="text-center text-slate-500 py-10">No related videos found</p>}
+                {hasMoreRelated && <div className="space-y-3">{[...Array(3)].map((_, i) => <SkeletonSidebarCard key={i} />)}</div>}
               </div>
             </div>
           ) : (
             <>
               <div className="flex gap-3 overflow-x-auto pb-4 sticky top-14 bg-[#0F0F0F] z-50 py-3 scrollbar-none">
                 {categories.map(cat => (
-                  <button key={cat} onClick={() => router.push(`/?category=${cat}`)} className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap active:scale-95", (category === cat || (!category && (!query && cat === "All"))) ? "bg-white text-black font-bold" : "bg-white/10 hover:bg-white/20")}>{cat}</button>
+                  <button key={cat} onClick={() => router.push(`/?category=${cat}`)} className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-all", (category === cat || (!category && (!query && cat === "All"))) ? "bg-white text-black font-bold" : "bg-white/10 hover:bg-white/20")}>{cat}</button>
                 ))}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-10 mt-2">
-                {videos.map((video, index) => (
-                  <div key={video.id + index} ref={index === videos.length - 1 ? lastVideoRef : null}><VideoCard video={video} onClick={() => router.push(`/?v=${video.id}`)} /></div>
+                {videos.map((video) => (
+                  <VideoCard key={video.id} video={video} onClick={() => router.push(`/?v=${video.id}`)} />
                 ))}
                 {loading && [...Array(10)].map((_, i) => <SkeletonCard key={i} />)}
               </div>
@@ -232,12 +194,6 @@ function YouTubeContent() {
           )}
         </main>
       </div>
-      <style jsx global>{`
-        .scrollbar-none::-webkit-scrollbar { display: none; }
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #444; }
-      `}</style>
     </div>
   );
 }
@@ -251,17 +207,15 @@ function SidebarItem({ icon, label, active, onClick }: { icon: any, label: strin
 function VideoCard({ video, onClick }: { video: Video, onClick: () => void }) {
   return (
     <div className="flex flex-col gap-3 group cursor-pointer" onClick={onClick}>
-      <div className="aspect-video w-full rounded-xl overflow-hidden relative bg-[#222] shadow-lg group-hover:shadow-2xl transition-all ring-1 ring-white/5">
-        <img src={video.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" loading="lazy" />
-        <div className={cn("absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-lg", video.isLive ? "bg-[#CC0000] flex items-center gap-1" : "bg-black/80 text-white")}>
-          {video.isLive && <div className="w-1 h-1 rounded-full bg-white animate-pulse" />}{video.isLive ? "LIVE" : (video.duration || "10:42")}
-        </div>
+      <div className={cn("aspect-video w-full rounded-xl overflow-hidden relative bg-[#222] shadow-lg transition-all", video.isShort ? "aspect-[9/16]" : "")}>
+        <img src={video.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" />
+        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-black/80">{video.isLive ? "LIVE" : video.duration}</div>
       </div>
-      <div className="flex gap-3 pr-2">
-        <img src={video.channelAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(video.channel || 'Y')}&background=random&color=fff`} className="w-9 h-9 rounded-full object-cover mt-1 border border-white/5 shadow-sm" />
+      <div className="flex gap-3">
+        {!video.isShort && <img src={video.channelAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(video.channel)}&background=random`} className="w-9 h-9 rounded-full" />}
         <div className="flex flex-col gap-1 overflow-hidden">
-          <h3 className="text-sm font-bold line-clamp-2 leading-tight group-hover:text-[#3EA6FF] transition-colors">{video.title}</h3>
-          <div className="text-xs text-[#AAAAAA] mt-1 font-medium"><p className="hover:text-white transition-colors">{video.channel}</p><p className={cn(video.isLive ? "text-[#FF4E45] font-bold" : "")}>{video.views} • {video.time}</p></div>
+          <h3 className="text-sm font-bold line-clamp-2 leading-tight">{video.title}</h3>
+          <div className="text-xs text-[#AAAAAA] font-medium"><p>{video.channel}</p><p>{video.views} • {video.time}</p></div>
         </div>
       </div>
     </div>
@@ -270,13 +224,13 @@ function VideoCard({ video, onClick }: { video: Video, onClick: () => void }) {
 
 function SidebarCard({ video, onClick }: { video: Video, onClick: () => void }) {
   return (
-    <div className="flex gap-2 group cursor-pointer p-1 rounded-lg hover:bg-white/5 transition-all" onClick={onClick}>
-      <div className="w-[168px] aspect-video rounded-lg overflow-hidden flex-shrink-0 bg-[#222] relative ring-1 ring-white/5">
-        <img src={video.thumbnail} className="w-full h-full object-cover" loading="lazy" />
-        <div className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-[10px] font-bold">{video.isLive ? "LIVE" : (video.duration || "10:42")}</div>
+    <div className="flex gap-2 group cursor-pointer p-1 rounded-lg hover:bg-white/5" onClick={onClick}>
+      <div className="w-[168px] aspect-video rounded-lg overflow-hidden flex-shrink-0 bg-[#222] relative">
+        <img src={video.thumbnail} className="w-full h-full object-cover" />
+        <div className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-[10px] font-bold">{video.duration}</div>
       </div>
       <div className="flex flex-col gap-0.5 overflow-hidden py-1">
-        <h3 className="text-[13px] font-bold line-clamp-2 leading-tight group-hover:text-[#3EA6FF] transition-colors">{video.title}</h3>
+        <h3 className="text-[13px] font-bold line-clamp-2 leading-tight">{video.title}</h3>
         <p className="text-[11px] text-[#AAAAAA] mt-1">{video.channel}</p>
         <p className="text-[11px] text-[#AAAAAA]">{video.views}</p>
       </div>
@@ -284,20 +238,5 @@ function SidebarCard({ video, onClick }: { video: Video, onClick: () => void }) 
   );
 }
 
-function SkeletonCard() {
-  return (
-    <div className="flex flex-col gap-3 animate-pulse">
-      <div className="aspect-video w-full rounded-xl bg-[#222]" />
-      <div className="flex gap-3 px-1"><div className="w-9 h-9 rounded-full bg-[#222]" /><div className="flex-1 space-y-2"><div className="h-4 bg-[#222] rounded w-full" /><div className="h-3 bg-[#222] rounded w-2/3" /></div></div>
-    </div>
-  );
-}
-
-function SkeletonSidebarCard() {
-  return (
-    <div className="flex gap-2 animate-pulse p-1">
-      <div className="w-[168px] aspect-video rounded-lg bg-[#222] flex-shrink-0" />
-      <div className="flex-1 space-y-2 py-1"><div className="h-3 bg-[#222] rounded w-full" /><div className="h-3 bg-[#222] rounded w-5/6" /><div className="h-2 bg-[#222] rounded w-1/2 mt-2" /></div>
-    </div>
-  );
-}
+function SkeletonCard() { return (<div className="flex flex-col gap-3 animate-pulse"><div className="aspect-video w-full rounded-xl bg-[#222]" /><div className="flex gap-3 px-1"><div className="w-9 h-9 rounded-full bg-[#222]" /><div className="flex-1 space-y-2"><div className="h-4 bg-[#222] rounded w-full" /><div className="h-3 bg-[#222] rounded w-2/3" /></div></div></div>); }
+function SkeletonSidebarCard() { return (<div className="flex gap-2 animate-pulse p-1"><div className="w-[168px] aspect-video rounded-lg bg-[#222] flex-shrink-0" /><div className="flex-1 space-y-2 py-1"><div className="h-3 bg-[#222] rounded w-full" /><div className="h-3 bg-[#222] rounded w-5/6" /></div></div>); }
