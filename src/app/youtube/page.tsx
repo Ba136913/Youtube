@@ -117,6 +117,30 @@ function YouTubeContent() {
 
   useEffect(() => { if (videoId) { setRelatedPage(1); fetchVideos({ relatedId: videoId, page: 1 }); } }, [videoId]);
 
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastVideoRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading || !hasMore || videoId) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        setPage(p => { const n = p + 1; fetchVideos({ q: query ?? undefined, category: category ?? undefined, page: n }); return n; });
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, hasMore, videoId, query, category]);
+
+  const relObserver = useRef<IntersectionObserver | null>(null);
+  const lastRelVideoRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading || !hasMoreRelated || !videoId) return;
+    if (relObserver.current) relObserver.current.disconnect();
+    relObserver.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        setRelatedPage(p => { const n = p + 1; fetchVideos({ relatedId: videoId, page: n }); return n; });
+      }
+    });
+    if (node) relObserver.current.observe(node);
+  }, [loading, hasMoreRelated, videoId]);
+
   const currentVideo = [...videos, ...relatedVideos].find(v => v.id === videoId);
 
   return (
