@@ -72,7 +72,12 @@ function YouTubeContent() {
       else if (params.category && params.category !== 'All') url += `q=${encodeURIComponent(params.category)}&`;
       url += `page=${pageNum}`;
 
-      const res = await fetch(url);
+      const headers: Record<string, string> = {};
+      if ((session as any)?.accessToken) {
+        headers['Authorization'] = `Bearer ${(session as any).accessToken}`;
+      }
+
+      const res = await fetch(url, { headers });
       setSyncProgress(70);
       const data = await res.json();
       
@@ -95,13 +100,13 @@ function YouTubeContent() {
             setHasMore(data.videos.length >= 5);
         }
       } else if (pageNum === 1 && !isRelated) {
-          setVideos(FALLBACK_VIDS);
+          setVideos([]);
           setHasMore(false);
       } else if (!isRelated) {
           setHasMore(false);
       }
     } catch (e) { 
-        if (pageNum === 1 && !isRelated) setVideos(FALLBACK_VIDS);
+        if (pageNum === 1 && !isRelated) setVideos([]);
     } finally {
       setSyncProgress(100);
       setTimeout(() => { setLoading(false); setSyncProgress(0); }, 300);
