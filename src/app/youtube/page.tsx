@@ -55,7 +55,7 @@ function YouTubeContent() {
 
   useEffect(() => { setSearchInput(query || ""); }, [query]);
 
-  const fetchVideos = async (params: { q?: string, category?: string, page?: number, relatedId?: string }) => {
+  const fetchVideos = async (params: { q?: string, category?: string, page?: number, relatedId?: string, type?: string }) => {
     const isRelated = !!params.relatedId;
     const pageNum = params.page || 1;
     
@@ -70,6 +70,7 @@ function YouTubeContent() {
       if (params.relatedId) url += `related=${params.relatedId}&`;
       else if (params.q) url += `q=${encodeURIComponent(params.q)}&`;
       else if (params.category && params.category !== 'All') url += `q=${encodeURIComponent(params.category)}&`;
+      else if (params.type) url += `type=${params.type}&`;
       url += `page=${pageNum}`;
 
       const headers: Record<string, string> = {};
@@ -78,18 +79,15 @@ function YouTubeContent() {
       }
 
       const res = await fetch(url, { headers });
-      setSyncProgress(70);
       const data = await res.json();
       
       if (data.videos && data.videos.length > 0) {
         if (isRelated) {
-            const perPage = 10;
-            const start = (pageNum - 1) * perPage;
-            const chunk = data.videos.slice(start, start + perPage);
             setRelatedVideos(prev => {
-                const next = pageNum === 1 ? chunk : [...prev, ...chunk];
-                setHasMoreRelated(data.videos.length > next.length);
-                return next;
+                const combined = pageNum === 1 ? data.videos : [...prev, ...data.videos];
+                const unique = Array.from(new Map(combined.map((v: any) => [v.id, v])).values());
+                setHasMoreRelated(data.videos.length >= 10);
+                return unique as Video[];
             });
         } else {
             setVideos(prev => {
@@ -99,14 +97,12 @@ function YouTubeContent() {
             });
             setHasMore(data.videos.length >= 5);
         }
-      } else if (pageNum === 1 && !isRelated) {
-          setVideos([]);
-          setHasMore(false);
-      } else if (!isRelated) {
-          setHasMore(false);
+      } else {
+          if (isRelated) setHasMoreRelated(false);
+          else setHasMore(false);
       }
     } catch (e) { 
-        if (pageNum === 1 && !isRelated) setVideos([]);
+        console.error(e);
     } finally {
       setSyncProgress(100);
       setTimeout(() => { setLoading(false); setSyncProgress(0); }, 300);
@@ -115,36 +111,13 @@ function YouTubeContent() {
 
   useEffect(() => {
     setPage(1);
-    fetchVideos({ q: query ?? undefined, category: category ?? undefined, page: 1 });
+    const type = category === 'History' ? 'liked' : (category === 'Subscriptions' ? 'subscriptions' : undefined);
+    fetchVideos({ q: query ?? undefined, category: category ?? undefined, page: 1, type });
   }, [query, category]);
 
   useEffect(() => { if (videoId) { setRelatedPage(1); fetchVideos({ relatedId: videoId, page: 1 }); } }, [videoId]);
 
-  const observer = useRef<IntersectionObserver | null>(null);
-  const lastVideoRef = useCallback((node: HTMLDivElement | null) => {
-    if (loading || !hasMore || videoId) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        setPage(p => { const n = p + 1; fetchVideos({ q: query ?? undefined, category: category ?? undefined, page: n }); return n; });
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loading, hasMore, videoId, query, category]);
-
-  const relObserver = useRef<IntersectionObserver | null>(null);
-  const lastRelVideoRef = useCallback((node: HTMLDivElement | null) => {
-    if (loading || !hasMoreRelated || !videoId) return;
-    if (relObserver.current) relObserver.current.disconnect();
-    relObserver.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        setRelatedPage(p => { const n = p + 1; fetchVideos({ relatedId: videoId, page: n }); return n; });
-      }
-    });
-    if (node) relObserver.current.observe(node);
-  }, [loading, hasMoreRelated, videoId]);
-
-  const categories = ["All", "Music", "Gaming", "News", "Bollywood", "Cricket", "Comedy", "Shorts", "Live", "Lo-fi"];
+  const currentVideo = [...videos, ...relatedVideos].find(v => v.id === videoId);
 
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-[#F1F1F1] font-sans overflow-x-hidden">
@@ -170,7 +143,7 @@ function YouTubeContent() {
         <div className={cn("items-center gap-2", showMobileSearch ? "hidden" : "flex")}>
           <button onClick={() => setShowMobileSearch(true)} className="md:hidden p-2 hover:bg-white/10 rounded-full"><Search size={22} /></button>
           {session ? (
-            <img src={session.user?.image || ""} className="w-8 h-8 rounded-full border border-white/10 cursor-pointer shadow-lg" onClick={() => signOut()} />
+            <img src={session.user?.image || ""} className="w-8 h-8 rounded-full border border-white/10 cursor-pointer shadow-lg" onClick={() => signOut()} title={session.user?.name || ""} />
           ) : (
             <button onClick={() => signIn('google')} className="flex items-center gap-2 px-3 py-1.5 border border-white/10 rounded-full text-[#3EA6FF] font-medium hover:bg-[#3EA6FF]/10 text-sm font-bold"><LogIn size={18} /> Sign in</button>
           )}
@@ -180,6 +153,9 @@ function YouTubeContent() {
       <div className="flex">
         <aside className="w-[240px] hidden lg:flex flex-col p-3 gap-1 sticky top-14 h-[calc(100vh-56px)] border-r border-white/5 overflow-y-auto custom-scrollbar">
           <SidebarItem icon={<Home size={22} />} label="Home" active={!videoId && !query && (!category || category === "All")} onClick={() => router.push('/')} />
+          <SidebarItem icon={<History size={22} />} label="History" active={category === "History"} onClick={() => router.push('/?category=History')} />
+          <SidebarItem icon={<Library size={22} />} label="Subscriptions" active={category === "Subscriptions"} onClick={() => router.push('/?category=Subscriptions')} />
+          <hr className="my-2 border-white/10" />
           <SidebarItem icon={<Flame size={22} />} label="Trending" active={category === "Trending"} onClick={() => router.push('/?category=Trending')} />
           <SidebarItem icon={<Music2 size={22} />} label="Music" active={category === "Music"} onClick={() => router.push('/?category=Music')} />
           <SidebarItem icon={<Gamepad2 size={22} />} label="Gaming" active={category === "Gaming"} onClick={() => router.push('/?category=Gaming')} />
@@ -193,10 +169,13 @@ function YouTubeContent() {
                   <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0`} frameBorder="0" allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
                 </div>
                 <div className="mt-4 space-y-3 px-1">
-                  <h1 className="text-xl font-bold line-clamp-2 leading-snug">{relatedVideos.find(v => v.id === videoId)?.title || videos.find(v => v.id === videoId)?.title || "Premium Stream"}</h1>
+                  <h1 className="text-xl font-bold line-clamp-2 leading-snug">{currentVideo?.title || "Premium Stream"}</h1>
                   <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-                    <img src={relatedVideos.find(v => v.id === videoId)?.channelAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(relatedVideos.find(v => v.id === videoId)?.channel || 'Y')}&background=random&color=fff`} className="w-10 h-10 rounded-full object-cover border border-white/5 shadow-sm" />
-                    <div className="flex-1"><p className="font-bold">{relatedVideos.find(v => v.id === videoId)?.channel || "Channel Name"}</p><p className="text-xs text-[#AAAAAA]">1.2M subscribers</p></div>
+                    <img src={currentVideo?.channelAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentVideo?.channel || 'Y')}&background=random&color=fff`} className="w-10 h-10 rounded-full object-cover border border-white/5 shadow-sm" />
+                    <div className="flex-1">
+                        <p className="font-bold">{currentVideo?.channel || "Channel Name"}</p>
+                        <p className="text-xs text-[#AAAAAA]">{currentVideo?.views?.includes('views') ? '1.2M subscribers' : 'Official Channel'}</p>
+                    </div>
                     <button className="bg-[#F1F1F1] text-black px-4 py-2 rounded-full text-sm font-bold ml-4 hover:bg-[#D9D9D9] transition-colors">Subscribe</button>
                   </div>
                 </div>
@@ -207,6 +186,7 @@ function YouTubeContent() {
                   <div key={video.id + index} ref={index === relatedVideos.length - 1 ? lastRelVideoRef : null}><SidebarCard video={video} onClick={() => router.push(`/?v=${video.id}`)} /></div>
                 ))}
                 {hasMoreRelated && [...Array(3)].map((_, i) => <SkeletonSidebarCard key={i} />)}
+                {!hasMoreRelated && relatedVideos.length === 0 && <p className="text-center text-slate-500 py-10">No related videos found</p>}
               </div>
             </div>
           ) : (
