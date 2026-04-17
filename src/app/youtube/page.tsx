@@ -80,13 +80,16 @@ function YouTubeContent() {
         if (isRelated) {
             const perPage = 10;
             const start = (pageNum - 1) * perPage;
-            const chunk = data.videos.slice(0, start + perPage);
-            setRelatedVideos(prev => pageNum === 1 ? chunk : [...prev, ...chunk]);
-            setHasMoreRelated(data.videos.length > prev.length + chunk.length);
+            const chunk = data.videos.slice(start, start + perPage);
+            setRelatedVideos(prev => {
+                const next = pageNum === 1 ? chunk : [...prev, ...chunk];
+                setHasMoreRelated(data.videos.length > next.length);
+                return next;
+            });
         } else {
             setVideos(prev => {
-                const combined = pageNum === 1 ? data.videos : [...prev, ...data.videos];
-                const unique = Array.from(new Map(combined.map(v => [v.id, v])).values());
+                const combined = pageNum === 1 ? (data.videos as Video[]) : [...prev, ...(data.videos as Video[])];
+                const unique = Array.from(new Map(combined.map((v: Video) => [v.id, v])).values());
                 return unique;
             });
             setHasMore(data.videos.length >= 5);
@@ -107,7 +110,7 @@ function YouTubeContent() {
 
   useEffect(() => {
     setPage(1);
-    fetchVideos({ q: query, category, page: 1 });
+    fetchVideos({ q: query ?? undefined, category: category ?? undefined, page: 1 });
   }, [query, category]);
 
   useEffect(() => { if (videoId) { setRelatedPage(1); fetchVideos({ relatedId: videoId, page: 1 }); } }, [videoId]);
@@ -118,7 +121,7 @@ function YouTubeContent() {
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting) {
-        setPage(p => { const n = p + 1; fetchVideos({ q: query, category, page: n }); return n; });
+        setPage(p => { const n = p + 1; fetchVideos({ q: query ?? undefined, category: category ?? undefined, page: n }); return n; });
       }
     });
     if (node) observer.current.observe(node);
